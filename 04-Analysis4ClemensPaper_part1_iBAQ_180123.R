@@ -41,7 +41,7 @@ path_proteinGroups  = paste(path, "Reruns_proteinGroups.txt",sep = "/")
 # path_summaryFile = paste(path, "summary.txt",sep="/")
 
 # output = "G:/2015/TB/Alexander/Proteomics/RifTimePoints1/RifPaper/Output/" # Where ggplots etc. ought to be saved.
-output = checkMake(mainDir = path,subDir = "Alex/Output_iBAQ_6_2018_01_23/")
+output = checkMake(mainDir = path,subDir = "Alex/Output_iBAQ_6_2018_02_01/")
 # Scale = 5 # Set generally for ggplots
 
 # Load Tables #
@@ -463,7 +463,7 @@ export2Perseus[,iBAQ_index_clean] <- proteinGroups_clean_norm_iBAQ[,-1]
 # Put all that t-test coding to work and make a custom volcano plot.
 
 # ```{r,echo=FALSE}
-library(dplyr)
+# library(dplyr)
 # Split into time points.
 input = export2Perseus  #Choose input data frame
 pVal.CutOff = 0.05
@@ -565,7 +565,7 @@ paste("CW pVal:",length(which(data_CW_added$pVals<pVal.CutOff)))
 paste("CW pVal & FCthres:",length(which(data_CW_added$pVals<pVal.CutOff & abs(data_CW_added$logFC)>CW_FCthres)))
 data_CW_pValC = filter(data_CW_added,pVals<pVal.CutOff)
 data_CW_FC = filter(data_CW_pValC,abs(logFC)>CW_FCthres)
-data_CW_pValC_comp <- transform(data_CW_pValC, Compartment = rep("CW",times=nrow(data_CW_pValC)))
+data_CW_pValC_comp <- transform(data_CW_pValC, Compartment = rep("CW",times=nrow(data_CW_pValC)), Strongly.Dysregulated = (Majority.protein.IDs %in% data_CW_FC$Majority.protein.IDs))
 
 datain = data_Cyto
 data_Cyto_clean = cutrows(datain) # Remove any rows with zeroes
@@ -578,7 +578,7 @@ paste("Cyto pVal:",length(which(data_Cyto_added$pVals<pVal.CutOff)))
 paste("Cyto pVal & FCthres:",length(which(data_Cyto_added$pVals<pVal.CutOff & abs(data_Cyto_added$logFC)>Cyto_FCthres)))
 data_Cyto_pValC = filter(data_Cyto_added,pVals<pVal.CutOff)
 data_Cyto_FC = filter(data_Cyto_pValC,abs(logFC)>Cyto_FCthres)
-data_Cyto_pValC_comp <- transform(data_Cyto_pValC, Compartment = rep("Cyto",times=nrow(data_Cyto_pValC)))
+data_Cyto_pValC_comp <- transform(data_Cyto_pValC, Compartment = rep("Cyto",times=nrow(data_Cyto_pValC)), Strongly.Dysregulated = (Majority.protein.IDs %in% data_Cyto_FC$Majority.protein.IDs))
 
 datain = data_CD
 data_CD_clean = cutrows(datain) # Remove any rows with zeroes
@@ -591,7 +591,7 @@ paste("CD pVal:",length(which(data_CD_added$pVals<pVal.CutOff)))
 paste("CD pVal & FCthres:",length(which(data_CD_added$pVals<pVal.CutOff & abs(data_CD_added$logFC)>CD_FCthres)))
 data_CD_pValC = filter(data_CD_added,pVals<pVal.CutOff)
 data_CD_FC = filter(data_CD_pValC,abs(logFC)>CD_FCthres)
-data_CD_pValC_comp <- transform(data_CD_pValC, Compartment = rep("CD",times=nrow(data_CD_pValC)))
+data_CD_pValC_comp <- transform(data_CD_pValC, Compartment = rep("CD",times=nrow(data_CD_pValC)),Strongly.Dysregulated = (Majority.protein.IDs %in% data_CD_FC$Majority.protein.IDs))
 
 maxLength = max(nrow(data_CW_pValC),nrow(data_Cyto_pValC),nrow(data_CD_pValC))
 
@@ -602,6 +602,29 @@ assignStars <- function(numVec,three=0.001,two=0.01,one=0.05,ns=1,stars=c("NS","
 }
 
 data_all_pValC <- transform(data_all_pValC, Stars = assignStars(pVals))
+strongDysregProts <- filter(data_all_pValC,Strongly.Dysregulated==T)$Majority.protein.IDs
+length(unique(strongDysregProts))
+length(unique(data_all_pValC$Majority.protein.IDs))
+length(unique(filter(data_all_pValC,Compartment %in% c("CD","CW"))$Majority.protein.IDs))
+
+# cellWallProteome_RifExp <- read.csv(file = "Alex/Copy of Copy of Cell wall proteome after enrichment_RifExp.csv",header = T,sep = ";")
+# cellWallProteome_RifExp <- select(cellWallProteome_RifExp, -c(4:ncol(cellWallProteome_RifExp)))
+# colnames(cellWallProteome_RifExp)[1] <- "Protein.IDs"
+# write.csv(x = cellWallProteome_RifExp,file = "Alex/Cell wall Proteome after Enrichment.csv",row.names = F)
+cellWallProteome_RifExp <- read.csv("Alex/Cell wall Proteome after Enrichment.csv")
+
+cellWallProteome_uniq <- unique(cellWallProteome_RifExp$Protein.IDs) # 1050 distinct cell wall proteins
+sum(cellWallProteome_uniq %in% unique(filter(data_all_pValC,Compartment %in% c("CD"))$Majority.protein.IDs)) # 193
+sum(cellWallProteome_uniq %in% unique(filter(data_all_pValC,Compartment %in% c("CW","CD"))$Majority.protein.IDs)) # 278
+sum(cellWallProteome_uniq %in% unique(filter(data_all_pValC,Compartment %in% c("CW","Cyto","CD"))$Majority.protein.IDs)) # 330
+
+originalRif_dysregProts <- read.csv("Alex/OriginalRif_dysregProteins.tsv.txt",sep = "\t")
+sum(cellWallProteome_uniq %in% filter(originalRif_dysregProts,Time.Point =="T2")$Uniprot.Protein.ID) #59
+originalRif_proteinGroups_T2 <- read.csv(file = "Alex/OriginalRif_proteinGroups_T2.txt",header = T,sep = "\t")
+length(unlist(str_split(string = originalRif_proteinGroups_T2$Majority.protein.IDs,pattern = ";")))
+
+sum(originalRif_proteinGroups_T2$Majority.protein.IDs %in% cellWallProteome_uniq)
+
 #### Present and Absent ####
 doPresAbs <- F
 
